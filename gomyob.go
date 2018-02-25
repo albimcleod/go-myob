@@ -59,6 +59,8 @@ func (v *MYOB) AccessToken() (string, string, time.Time, error) {
 
 	request, _ := json.Marshal(data)
 
+	fmt.Println(string(request))
+
 	client := &http.Client{}
 	r, _ := http.NewRequest("POST", urlStr, bytes.NewBuffer(request))
 
@@ -81,6 +83,8 @@ func (v *MYOB) AccessToken() (string, string, time.Time, error) {
 		}
 		return resp.AccessToken, resp.RefreshToken, time.Now().Add(time.Duration(resp.ExpiresIn) * time.Millisecond), nil
 	}
+
+	fmt.Println(string(rawResBody))
 
 	return "", "", time.Now(), fmt.Errorf("Failed to get access token: %s", res.Status)
 }
