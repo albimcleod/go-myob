@@ -7,10 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
-
-	"golang.org/x/oauth2"
 )
 
 const (
@@ -45,113 +42,58 @@ func NewClient(code string, clientID string, clientSecret string, redirectURI st
 
 // AccessToken will get a new access token
 func (v *MYOB) AccessToken() (string, string, time.Time, error) {
-	/*
-		u, _ := url.ParseRequestURI(baseURL)
-		u.Path = tokenURL
-		urlStr := fmt.Sprintf("%v", u)
-
-		data := TokenRequest{
-			ClientID:     v.ClientID,
-			ClientSecret: v.ClientSecret,
-			Code:         v.StoreCode,
-			Scope:        "CompanyFile",
-			RedirectURI:  v.RedirectURI,
-			GrantType:    "authorization_code",
-		}
-		//request, _ := json.Marshal(data)
-		*
-		data := url.Values{}
-		data.Set("client_id", v.ClientID)
-		data.Set("client_secret", v.ClientSecret)
-		data.Set("code", v.StoreCode)
-		data.Set("scope", "CompanyFile")
-		data.Set("redirect_uri", v.RedirectURI)
-		data.Set("grant_type", "authorization_code")
-
-		fmt.Println(urlStr)
-
-		client := &http.Client{}
-		//r, _ := http.NewRequest("POST", urlStr, bytes.NewBuffer(request))
-		r, _ := http.NewRequest("POST", urlStr, strings.NewReader(data.Encode()))
-
-		r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-		r.Header.Add("Accept", "application/json")
-		r.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
-
-		res, _ := client.Do(r)
-
-		rawResBody, err := ioutil.ReadAll(res.Body)
-
-		fmt.Println(string(rawResBody))
-
-		if err != nil {
-			return "", "", time.Now(), fmt.Errorf("%v", string(rawResBody))
-		}
-
-		if res.StatusCode == 200 {
-			resp := &TokenResponse{}
-			if err := json.Unmarshal(rawResBody, resp); err != nil {
-				return "", "", time.Now(), err
-			}
-			return resp.AccessToken, resp.RefreshToken, time.Now().Add(time.Duration(resp.ExpiresIn) * time.Millisecond), nil
-		}
-
-		fmt.Println(string(rawResBody))
-
-		return "", "", time.Now(), fmt.Errorf("Failed to get access token: %s", res.Status)
-	*/
 
 	u, _ := url.ParseRequestURI(baseURL)
 	u.Path = tokenURL
 	urlStr := fmt.Sprintf("%v", u)
 
-	fmt.Println(urlStr)
+	request := fmt.Sprintf("grant_type=authorization_code&code=%s&redirect_uri=%s&client_id=%s&client_secret=%s&scope=CompanyFile", v.StoreCode, v.RedirectURI, v.ClientID, v.ClientSecret)
 
-	config := oauth2.Config{
-		ClientID:     v.ClientID,
-		ClientSecret: v.ClientSecret,
-		Scopes:       []string{"CompanyFile"},
-		RedirectURL:  v.RedirectURI,
-		Endpoint: oauth2.Endpoint{
-			AuthURL:  urlStr,
-			TokenURL: urlStr,
-		},
-	}
+	client := &http.Client{}
+	r, _ := http.NewRequest("POST", urlStr, bytes.NewBuffer([]byte(request)))
 
-	fmt.Println(config)
+	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	token, err := config.Exchange(oauth2.NoContext, v.StoreCode)
+	res, _ := client.Do(r)
+
+	rawResBody, err := ioutil.ReadAll(res.Body)
 
 	if err != nil {
-		return "", "", time.Now(), err
+		return "", "", time.Now(), fmt.Errorf("%v", string(rawResBody))
 	}
 
-	return token.AccessToken, token.RefreshToken, time.Now(), err
+	if res.StatusCode == 200 {
+		resp := &TokenResponse{}
+		if err := json.Unmarshal(rawResBody, resp); err != nil {
+			fmt.Println("3", string(rawResBody), err)
+			return "", "", time.Now(), err
+		}
+		fmt.Println("4", string(rawResBody))
+		return resp.AccessToken, resp.RefreshToken, time.Now().Add(time.Duration(1200) * time.Millisecond), nil
+	}
 
+	return "", "", time.Now(), fmt.Errorf("Failed to get access token: %s", res.Status)
 }
 
 // RefreshToken will get a new refresg token
 func (v *MYOB) RefreshToken(refreshtoken string) (string, string, time.Time, error) {
 
-	data := TokenRequest{
-		ClientID:     v.ClientID,
-		ClientSecret: v.ClientSecret,
-		RefreshToken: refreshtoken,
-		GrantType:    "refresh_token",
-	}
-
 	u, _ := url.ParseRequestURI(baseURL)
-	u.Path = refreshURL
+	u.Path = tokenURL
 	urlStr := fmt.Sprintf("%v", u)
 
-	request, _ := json.Marshal(data)
+	request := fmt.Sprintf("grant_type=refresh_token&refresh_token=%s&redirect_uri=%s&client_id=%s&client_secret=%s", refreshtoken, v.RedirectURI, v.ClientID, v.ClientSecret)
+
+	fmt.Println("--------------------------")
+	fmt.Println("Calling Reckon", urlStr)
+	fmt.Println(string(request))
 
 	client := &http.Client{}
-	r, _ := http.NewRequest("POST", urlStr, bytes.NewBuffer(request))
+	r, _ := http.NewRequest("POST", urlStr, bytes.NewBuffer([]byte(request)))
 
 	r.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	r.Header.Add("Accept", "application/json")
-	r.Header.Add("Content-Length", strconv.Itoa(len(request)))
+
+	fmt.Println("--------------------------")
 
 	res, _ := client.Do(r)
 
@@ -166,8 +108,10 @@ func (v *MYOB) RefreshToken(refreshtoken string) (string, string, time.Time, err
 		if err := json.Unmarshal(rawResBody, resp); err != nil {
 			return "", "", time.Now(), err
 		}
-		return resp.AccessToken, resp.RefreshToken, time.Now().Add(time.Duration(resp.ExpiresIn) * time.Millisecond), nil
+		return resp.AccessToken, resp.RefreshToken, time.Now().Add(time.Duration(1200) * time.Millisecond), nil
 	}
 
-	return "", "", time.Now(), fmt.Errorf("Failed to get access token: %s", res.Status)
+	fmt.Println(string(rawResBody))
+
+	return "", "", time.Now(), fmt.Errorf("Failed to get refresh token: %s", res.Status)
 }
